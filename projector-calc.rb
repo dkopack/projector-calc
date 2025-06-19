@@ -129,8 +129,8 @@ class CLI
         @targets << (v || 60)
       end
       
-      opts.on("--hdr [NITS]", Float, "Add HDR target (default: 150 nits)") do |v|
-        @targets << (v || 150)
+      opts.on("--hdr [NITS]", Float, "Add HDR target (default: 120 nits)") do |v|
+        @targets << (v || 120)
       end
       
       opts.on_tail("-h", "--help", "Show this help message") do
@@ -145,12 +145,12 @@ class CLI
       
       opts.separator ""
       opts.separator "Examples:"
-      opts.separator "  #{$0} 60 150                    # Calculate for 60 and 150 nits"
-      opts.separator "  #{$0} --sdr --hdr               # Use default SDR (60) and HDR (150) values"
+      opts.separator "  #{$0} 60 120                    # Calculate for 60 and 120 nits"
+      opts.separator "  #{$0} --sdr --hdr               # Use default SDR (60) and HDR (120) values"
       opts.separator "  #{$0} --lumens 2000 --diagonal 100 120 200  # Custom projector and screen"
       opts.separator "  #{$0} --interactive             # Interactive mode"
       opts.separator "  #{$0} --info                    # Show screen info only"
-      opts.separator "  #{$0} --format json 60 150      # Output as JSON"
+      opts.separator "  #{$0} --format json 60 120      # Output as JSON"
     end
     
     begin
@@ -167,7 +167,7 @@ class CLI
       
       # Default targets if none specified and not in info or interactive mode
       if @targets.empty? && !@options[:interactive] && !@options[:info]
-        @targets = [60, 150]  # Default SDR and HDR
+        @targets = [60, 120]  # Default SDR and HDR
       end
       
     rescue OptionParser::InvalidOption, OptionParser::InvalidArgument => e
