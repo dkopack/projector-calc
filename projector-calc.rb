@@ -4,7 +4,6 @@ require 'optparse'
 require 'json'
 
 class ProjectorCalculator
-  # Conversion constants
   NITS_TO_FOOT_LAMBERTS = 0.292
   
   def initialize(projector_max_lumens, screen_diagonal, screen_gain = 1.0, aspect_ratio = 16.0/9.0)
@@ -17,7 +16,6 @@ class ProjectorCalculator
   end
   
   def calculate_screen_dimensions
-    # Calculate screen width and height from diagonal
     @screen_width = @screen_diagonal / Math.sqrt(1 + (1.0 / @aspect_ratio)**2)
     @screen_height = @screen_width / @aspect_ratio
     @screen_area_sq_inches = @screen_width * @screen_height
@@ -25,11 +23,8 @@ class ProjectorCalculator
   end
   
   def lumens_needed_for_nits(target_nits)
-    # Convert nits to foot-lamberts
     foot_lamberts = target_nits * NITS_TO_FOOT_LAMBERTS
-    
-    # Calculate lumens needed
-    foot_lamberts * @screen_area_sq_feet * @screen_gain
+    (foot_lamberts * @screen_area_sq_feet) / @screen_gain
   end
   
   def laser_power_for_nits(target_nits)
@@ -45,7 +40,7 @@ class ProjectorCalculator
   end
   
   def max_achievable_nits
-    max_foot_lamberts = @projector_max_lumens / (@screen_area_sq_feet * @screen_gain)
+    max_foot_lamberts = (@projector_max_lumens * @screen_gain) / @screen_area_sq_feet
     max_foot_lamberts / NITS_TO_FOOT_LAMBERTS
   end
   
@@ -151,12 +146,12 @@ class CLI
       opts.separator "  #{$0} --interactive             # Interactive mode"
       opts.separator "  #{$0} --info                    # Show screen info only"
       opts.separator "  #{$0} --format json 60 120      # Output as JSON"
+      opts.separator "  #{$0} --sdr 48 --hdr 200         # 48 nits SDR, 200 nits HDR"
     end
     
     begin
       parser.parse!
       
-      # Add remaining arguments as targets
       ARGV.each do |arg|
         begin
           @targets << Float(arg)
@@ -165,9 +160,8 @@ class CLI
         end
       end
       
-      # Default targets if none specified and not in info or interactive mode
       if @targets.empty? && !@options[:interactive] && !@options[:info]
-        @targets = [60, 120]  # Default SDR and HDR
+        @targets = [60, 120]
       end
       
     rescue OptionParser::InvalidOption, OptionParser::InvalidArgument => e
@@ -248,7 +242,6 @@ class CLI
         puts
       end
       
-      # Show warnings for unachievable targets
       unachievable = results.reject { |r| r[:achievable] }
       unless unachievable.empty?
         puts "Warnings:"
@@ -291,7 +284,6 @@ class CLI
   end
 end
 
-# Run the CLI if this file is executed directly
 if __FILE__ == $0
   CLI.new.run
 end
