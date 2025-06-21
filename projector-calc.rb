@@ -6,11 +6,12 @@ require 'json'
 class ProjectorCalculator
   NITS_TO_FOOT_LAMBERTS = 0.292
   
-  def initialize(projector_max_lumens, screen_diagonal, screen_gain = 1.0, aspect_ratio = 16.0/9.0)
+  def initialize(projector_max_lumens, screen_diagonal, screen_gain = 1.0, aspect_ratio = 16.0/9.0, min_laser_output = 70.0)
     @projector_max_lumens = projector_max_lumens
     @screen_diagonal = screen_diagonal
     @screen_gain = screen_gain
     @aspect_ratio = aspect_ratio
+    @min_laser_output = min_laser_output
     
     calculate_screen_dimensions
   end
@@ -29,13 +30,33 @@ class ProjectorCalculator
   
   def laser_power_for_nits(target_nits)
     lumens_needed = lumens_needed_for_nits(target_nits)
-    laser_percent = (lumens_needed / @projector_max_lumens.to_f) * 100
+    actual_laser_percent = (lumens_needed / @projector_max_lumens.to_f) * 100
+    
+    if actual_laser_percent < @min_laser_output
+      setting_value = 0
+      actual_output = @min_laser_output
+      actual_lumens = (@min_laser_output / 100.0) * @projector_max_lumens
+    else
+      setting_range = 100.0 - @min_laser_output
+      actual_range = actual_laser_percent - @min_laser_output
+      setting_value = (actual_range / setting_range) * 100
+      actual_output = actual_laser_percent
+      actual_lumens = (actual_laser_percent / 100.0) * @projector_max_lumens
+    end
+    
+    actual_foot_lamberts = (actual_lumens * @screen_gain) / @screen_area_sq_feet
+    actual_nits = actual_foot_lamberts / NITS_TO_FOOT_LAMBERTS
+    actual_lux = actual_nits * Math::PI
     
     {
       target_nits: target_nits,
       lumens_needed: lumens_needed.round,
-      laser_percent: laser_percent.round(1),
-      achievable: laser_percent <= 100
+      actual_laser_percent: actual_output.round(1),
+      setting_value: setting_value.round(1),
+      actual_lumens: actual_lumens.round,
+      actual_nits: actual_nits.round(1),
+      actual_lux: actual_lux.round(1),
+      achievable: actual_laser_percent <= 100
     }
   end
   
@@ -53,6 +74,7 @@ class ProjectorCalculator
       area_sq_feet: @screen_area_sq_feet.round(2),
       gain: @screen_gain,
       projector_max_lumens: @projector_max_lumens,
+      min_laser_output: @min_laser_output,
       max_achievable_nits: max_achievable_nits.round(1)
     }
   end
@@ -76,6 +98,7 @@ class CLI
       diagonal: 92,
       gain: 1.2,
       aspect_ratio: 16.0/9.0,
+      min_laser: 70.0,
       format: 'table',
       interactive: false,
       info: false
@@ -106,6 +129,10 @@ class CLI
       
       opts.on("-a", "--aspect-ratio RATIO", Float, "Aspect ratio as decimal (default: 1.78 for 16:9)") do |v|
         @options[:aspect_ratio] = v
+      end
+      
+      opts.on("-m", "--min-laser PERCENT", Float, "Minimum laser output at setting 0 (default: 70%)") do |v|
+        @options[:min_laser] = v
       end
       
       opts.on("-f", "--format FORMAT", ['table', 'json', 'csv'], "Output format: table, json, csv (default: table)") do |v|
@@ -142,7 +169,7 @@ class CLI
       opts.separator "Examples:"
       opts.separator "  #{$0} 60 120                    # Calculate for 60 and 120 nits"
       opts.separator "  #{$0} --sdr --hdr               # Use default SDR (60) and HDR (120) values"
-      opts.separator "  #{$0} --lumens 2000 --diagonal 100 120 200  # Custom projector and screen"
+      opts.separator "  #{$0} --lumens 2000 --diagonal 100 --min-laser 60 120 200  # Custom setup"
       opts.separator "  #{$0} --interactive             # Interactive mode"
       opts.separator "  #{$0} --info                    # Show screen info only"
       opts.separator "  #{$0} --format json 60 120      # Output as JSON"
@@ -178,7 +205,8 @@ class CLI
       @options[:lumens],
       @options[:diagonal],
       @options[:gain],
-      @options[:aspect_ratio]
+      @options[:aspect_ratio],
+      @options[:min_laser]
     )
     
     if @options[:info]
@@ -209,6 +237,7 @@ class CLI
       puts "Area: #{info[:area_sq_feet]} sq ft"
       puts "Gain: #{info[:gain]}x"
       puts "Projector max lumens: #{info[:projector_max_lumens]}"
+      puts "Minimum laser output: #{info[:min_laser_output]}%"
       puts "Maximum achievable brightness: #{info[:max_achievable_nits]} nits"
     end
   end
@@ -224,9 +253,9 @@ class CLI
       }
       puts JSON.pretty_generate(output)
     when 'csv'
-      puts "target_nits,lumens_needed,laser_percent,achievable"
+      puts "target_nits,lumens_needed,actual_laser_percent,setting_value,actual_lumens,actual_nits,actual_lux,achievable"
       results.each do |result|
-        puts "#{result[:target_nits]},#{result[:lumens_needed]},#{result[:laser_percent]},#{result[:achievable]}"
+        puts "#{result[:target_nits]},#{result[:lumens_needed]},#{result[:actual_laser_percent]},#{result[:setting_value]},#{result[:actual_lumens]},#{result[:actual_nits]},#{result[:actual_lux]},#{result[:achievable]}"
       end
     else
       show_screen_info(calculator) unless @targets.empty?
@@ -238,7 +267,9 @@ class CLI
         status = result[:achievable] ? "✓" : "⚠ NOT ACHIEVABLE"
         puts "#{result[:target_nits]} nits:"
         puts "  Lumens needed: #{result[:lumens_needed]}"
-        puts "  Laser power: #{result[:laser_percent]}% #{status}"
+        puts "  Actual laser output: #{result[:actual_laser_percent]}%"
+        puts "  Projector setting: #{result[:setting_value]} #{status}"
+        puts "  Expected brightness: #{result[:actual_nits]} nits (#{result[:actual_lux]} lux)"
         puts
       end
       
@@ -274,7 +305,9 @@ class CLI
         
         puts "Target: #{target_nits} nits"
         puts "Lumens needed: #{result[:lumens_needed]}"
-        puts "Laser power: #{result[:laser_percent]}%"
+        puts "Actual laser output: #{result[:actual_laser_percent]}%"
+        puts "Projector setting: #{result[:setting_value]}"
+        puts "Expected brightness: #{result[:actual_nits]} nits (#{result[:actual_lux]} lux)"
         puts "Achievable: #{result[:achievable] ? 'Yes' : 'No'}"
         puts
       rescue ArgumentError
