@@ -95,8 +95,8 @@ class CLI
   def initialize
     @options = {
       lumens: 1680,
-      diagonal: 92,
-      gain: 1.2,
+      diagonal: 100,
+      gain: 1.0,
       aspect_ratio: 16.0/9.0,
       min_laser: 70.0,
       format: 'table',
@@ -119,11 +119,11 @@ class CLI
         @options[:lumens] = v
       end
       
-      opts.on("-d", "--diagonal DIAGONAL", Float, "Screen diagonal in inches (default: 92)") do |v|
+      opts.on("-d", "--diagonal DIAGONAL", Float, "Screen diagonal in inches (default: 100)") do |v|
         @options[:diagonal] = v
       end
       
-      opts.on("-g", "--gain GAIN", Float, "Screen gain factor (default: 1.2)") do |v|
+      opts.on("-g", "--gain GAIN", Float, "Screen gain factor (default: 1.0)") do |v|
         @options[:gain] = v
       end
       
@@ -147,12 +147,12 @@ class CLI
         @options[:info] = true
       end
       
-      opts.on("--sdr [NITS]", Float, "Add SDR target (default: 60 nits)") do |v|
-        @targets << (v || 60)
+      opts.on("--sdr [NITS]", Float, "Add SDR target (default: 55 nits)") do |v|
+        @targets << (v || 55)
       end
       
-      opts.on("--hdr [NITS]", Float, "Add HDR target (default: 120 nits)") do |v|
-        @targets << (v || 120)
+      opts.on("--hdr [NITS]", Float, "Add HDR target (default: 150 nits)") do |v|
+        @targets << (v || 150)
       end
       
       opts.on_tail("-h", "--help", "Show this help message") do
@@ -167,12 +167,12 @@ class CLI
       
       opts.separator ""
       opts.separator "Examples:"
-      opts.separator "  #{$0} 60 120                    # Calculate for 60 and 120 nits"
-      opts.separator "  #{$0} --sdr --hdr               # Use default SDR (60) and HDR (120) values"
+      opts.separator "  #{$0} 55 150                    # Calculate for 55 and 150 nits"
+      opts.separator "  #{$0} --sdr --hdr               # Use default SDR (55) and HDR (150) values"
       opts.separator "  #{$0} --lumens 2000 --diagonal 100 --min-laser 60 120 200  # Custom setup"
       opts.separator "  #{$0} --interactive             # Interactive mode"
       opts.separator "  #{$0} --info                    # Show screen info only"
-      opts.separator "  #{$0} --format json 60 120      # Output as JSON"
+      opts.separator "  #{$0} --format json 55 150      # Output as JSON"
       opts.separator "  #{$0} --sdr 48 --hdr 200         # 48 nits SDR, 200 nits HDR"
     end
     
@@ -188,7 +188,7 @@ class CLI
       end
       
       if @targets.empty? && !@options[:interactive] && !@options[:info]
-        @targets = [60, 120]
+        @targets = [55, 150]
       end
       
     rescue OptionParser::InvalidOption, OptionParser::InvalidArgument => e
